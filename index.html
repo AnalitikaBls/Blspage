@@ -17,11 +17,15 @@
 
   <h1>Nuolaidos ir pasiūlymai BLS darbuotojams</h1>
 
-  <h2>Pasiūlymai</h2>
+  <!-- GRIDAS-->
+  <div id="grid" class="grid"></div>
+
+
+  <!-- DAUGIAPUSLAPIAI PDF-->
   <div id="carouselContainer"></div>
 
-  <h2>Kiti pasiūlymai</h2>
-  <div id="grid" class="grid"></div>
+  
+ 
 
   <!-- Fullscreen PDF viewer (canvas + arrows + Close) -->
   <div id="overlay" class="overlay">
@@ -133,37 +137,46 @@
 
     /* ========= FULLSCREEN RENDER (FIT PAGE, HIGH QUALITY) ========= */
     async function renderCurrentPage() {
-      if (!currentPdfDoc || !currentPage) return;
+  if (!currentPdfDoc) return;
 
-      const page = await currentPdfDoc.getPage(currentPage);
-      const canvas = pdfCanvas;
-      const ctx = canvas.getContext("2d");
+  const page = await currentPdfDoc.getPage(currentPage);
+  const canvas = pdfCanvas;
+  const ctx = canvas.getContext("2d");
 
-      const screenW = window.innerWidth * 0.95;
-      const screenH = window.innerHeight * 0.95;
+  // Viewport for PDF dimensions
+  const viewport = page.getViewport({ scale: 1 });
+  const pdfW = viewport.width;
+  const pdfH = viewport.height;
 
-      const viewportAtScale1 = page.getViewport({ scale: 1 });
-      const pdfW = viewportAtScale1.width;
-      const pdfH = viewportAtScale1.height;
+  // Size it must FIT onto the screen (CSS pixels)
+  const screenW = window.innerWidth * 0.95;
+  const screenH = window.innerHeight * 0.95;
 
-      const fitScale = Math.min(screenW / pdfW, screenH / pdfH);
-      const deviceScale = window.devicePixelRatio || 1;
-      const finalScale = fitScale * deviceScale;
+  const fitScale = Math.min(screenW / pdfW, screenH / pdfH);
 
-      const renderViewport = page.getViewport({ scale: finalScale });
+  // MAIN QUALITY BOOST — INTERNAL RENDER SCALE
+  const QUALITY_MULTIPLIER = 2.5; // change to 3 or 4 for ultra HD
+  const renderScale = fitScale * QUALITY_MULTIPLIER;
 
-      canvas.width = renderViewport.width;
-      canvas.height = renderViewport.height;
-      canvas.style.width  = (renderViewport.width  / deviceScale) + "px";
-      canvas.style.height = (renderViewport.height / deviceScale) + "px";
+  // Create high-resolution viewport
+  const renderViewport = page.getViewport({ scale: renderScale });
 
-      await page.render({
-        canvasContext: ctx,
-        viewport: renderViewport
-      }).promise;
+  // Render at high resolution
+  canvas.width = renderViewport.width;
+  canvas.height = renderViewport.height;
 
-      updateNavButtons();
-    }
+  // But show normal size in the browser (CSS downscaled)
+  canvas.style.width = `${pdfW * fitScale}px`;
+  canvas.style.height = `${pdfH * fitScale}px`;
+
+  await page.render({
+    canvasContext: ctx,
+    viewport: renderViewport
+  }).promise;
+
+  updateNavButtons();
+}
+
 
     function updateNavButtons() {
       if (totalPages <= 1) {
