@@ -136,38 +136,45 @@
     }
 
     /* ========= FULLSCREEN RENDER (FIT PAGE, HIGH QUALITY) ========= */
-    async function renderCurrentPage() {
+async function renderCurrentPage() {
   if (!currentPdfDoc) return;
 
   const page = await currentPdfDoc.getPage(currentPage);
   const canvas = pdfCanvas;
   const ctx = canvas.getContext("2d");
 
-  // Viewport for PDF dimensions
-  const viewport = page.getViewport({ scale: 1 });
-  const pdfW = viewport.width;
-  const pdfH = viewport.height;
+  const viewport1x = page.getViewport({ scale: 1 });
 
-  // Size it must FIT onto the screen (CSS pixels)
+  // Screen dimensions (fit 95% of window)
   const screenW = window.innerWidth * 0.95;
   const screenH = window.innerHeight * 0.95;
 
-  const fitScale = Math.min(screenW / pdfW, screenH / pdfH);
+  // Base scale to fit page into screen
+  const fitScale = Math.min(
+    screenW / viewport1x.width,
+    screenH / viewport1x.height
+  );
 
-  // MAIN QUALITY BOOST — INTERNAL RENDER SCALE
-  const QUALITY_MULTIPLIER = 2.5; // change to 3 or 4 for ultra HD
-  const renderScale = fitScale * QUALITY_MULTIPLIER;
+  // Get device pixel ratio for high-DPI screens
+  const dpr = window.devicePixelRatio || 1;
 
-  // Create high-resolution viewport
+  // Oversample for high quality (adaptive with DPR)
+  const oversample = 2; // can increase to 3 or 4 if performance allows
+  const renderScale = fitScale * oversample * dpr;
+
   const renderViewport = page.getViewport({ scale: renderScale });
 
-  // Render at high resolution
+  // Set canvas internal size (actual pixels)
   canvas.width = renderViewport.width;
   canvas.height = renderViewport.height;
 
-  // But show normal size in the browser (CSS downscaled)
-  canvas.style.width = `${pdfW * fitScale}px`;
-  canvas.style.height = `${pdfH * fitScale}px`;
+  // Set canvas CSS size (what user sees)
+  canvas.style.width = `${viewport1x.width * fitScale}px`;
+  canvas.style.height = `${viewport1x.height * fitScale}px`;
+
+  // Enable high-quality rendering
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
   await page.render({
     canvasContext: ctx,
@@ -176,6 +183,8 @@
 
   updateNavButtons();
 }
+
+
 
 
     function updateNavButtons() {
