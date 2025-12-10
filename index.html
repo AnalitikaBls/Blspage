@@ -4,28 +4,30 @@
   <meta charset="UTF-8" />
   <title>Nuolaidos ir Pasiūlymai</title>
   <link rel="stylesheet" href="style.css">
-  <!-- PDF.js via CDN -->
+
+  <!-- PDF.js CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   </script>
 </head>
+
 <body>
 
   <h1>Nuolaidos ir pasiūlymai BLS darbuotojams</h1>
 
-  <!-- GRIDAS-->
+  <!-- GRIDAS -->
   <div id="grid" class="grid"></div>
 
-  <!-- DAUGIAPUSLAPIAI PDF-->
+  <!-- MULTI-PAGE PDFs -->
   <div id="carouselContainer"></div>
 
-  <!-- DRAUDIMAS PDF-->
-  <h1>Sveikatos Draudimas</h1>
+  <!-- DRAUDIMAS PDFs -->
+  <h1>Sveikatos draudimas</h1>
   <div id="carouselContainerDraudimas"></div>
 
-  <!-- Fullscreen PDF viewer (canvas + arrows + Close) -->
+  <!-- Fullscreen PDF viewer -->
   <div id="overlay" class="overlay">
     <div class="overlay-box">
       <button class="close-btn" id="closeBtn">Close</button>
@@ -35,137 +37,161 @@
     </div>
   </div>
 
-  <script>
-    /* ========= FILE LISTS ========= */
-    const multiPagePdfs = [
-      "PDF`s/Antėja iki 2026 01 31.pdf",
-      "PDF`s/GYM HUB pasiūlymas.pdf"
-    ];
+<script>
+/* ========= FILE LISTS ========= */
+const multiPagePdfs = [
+  "PDF`s/Antėja iki 2026 01 31.pdf",
+  "PDF`s/GYM HUB pasiūlymas.pdf"
+];
 
-    const draudimasPdfs = [
-      "PDF`s/Draudimo varianto pasirinkimas.pdf",
-      "PDF`s/Sveikatos draudimo atmintinė.pdf"
-    ];
+const draudimasPdfs = [
+  "PDF`s/Sveikatos draudimo atmintinė.pdf",
+  "PDF`s/Draudimo varianto pasirinkimas.pdf"
+];
 
-    const singlePagePdfs = [
-      "PDF`s/Bricks4Kidz pasiūlymas darbuotojams iki 2025-06-01 d..pdf",
-      "PDF`s/CurioCity draugams – „Sanitex“, „UAB Baltic Logistic Solutions ir „Officeday darbuotojams taikomos išskirtinės nuolaidos.pdf",
-      "PDF`s/Fielmann pasiūlymas iki 2025-12-31 d..pdf",
-      "PDF`s/Girstučio komercinis pasiūlymas iki 2025.12.31.pdf",
-      "PDF`s/Hopcover pasiūlymas darbuotojams.pdf",
-      "PDF`s/Joglė pasiūlymas iki 2025-12-31.pdf",
-      "PDF`s/Knygos.lt pasiūlymas iki 2025-12-31 d..pdf",
-      "PDF`s/Makalius.lt pasiūlymas iki 2025-12-31 d..pdf",
-      "PDF`s/Optometrijos centro pasiūlymas iki 2025-12-31 d..pdf",
-      "PDF`s/Pro Bro +30 dienų nemokamai.pdf",
-      "PDF`s/Pro Bro abonemento pasiūlymas iki 2025-03-31.pdf",
-      "PDF`s/Šypsenos akademijos pasiūlymas iki 2025-12-31 d..pdf",
-      "PDF`s/Švaros brolių pasiūlymas.pdf",
-      "PDF`s/Vytautas Mineral SPA pasiūlymas iki 2025-12-20.pdf"
-    ];
+const singlePagePdfs = [
+  "PDF`s/Bricks4Kidz pasiūlymas darbuotojams iki 2025-06-01 d..pdf",
+  "PDF`s/CurioCity draugams – „Sanitex“, „UAB Baltic Logistic Solutions ir „Officeday darbuotojams taikomos išskirtinės nuolaidos.pdf",
+  "PDF`s/Fielmann pasiūlymas iki 2025-12-31 d..pdf",
+  "PDF`s/Girstučio komercinis pasiūlymas iki 2025.12.31.pdf",
+  "PDF`s/Hopcover pasiūlymas darbuotojams.pdf",
+  "PDF`s/Joglė pasiūlymas iki 2025-12-31.pdf",
+  "PDF`s/Knygos.lt pasiūlymas iki 2025-12-31 d..pdf",
+  "PDF`s/Makalius.lt pasiūlymas iki 2025-12-31 d..pdf",
+  "PDF`s/Optometrijos centro pasiūlymas iki 2025-12-31 d..pdf",
+  "PDF`s/Pro Bro +30 dienų nemokamai.pdf",
+  "PDF`s/Pro Bro abonemento pasiūlymas iki 2025-03-31.pdf",
+  "PDF`s/Šypsenos akademijos pasiūlymas iki 2025-12-31 d..pdf",
+  "PDF`s/Švaros brolių pasiūlymas.pdf",
+  "PDF`s/Vytautas Mineral SPA pasiūlymas iki 2025-12-20.pdf"
+];
 
-    /* ========= DOM ELEMENTS ========= */
-    const carouselContainer = document.getElementById("carouselContainer");
-    const carouselContainerDraudimas = document.getElementById("carouselContainerDraudimas");
-    const grid = document.getElementById("grid");
-    const overlay = document.getElementById("overlay");
-    const pdfCanvas = document.getElementById("pdfCanvas");
-    const closeBtn = document.getElementById("closeBtn");
-    const prevPageBtn = document.getElementById("prevPageBtn");
-    const nextPageBtn = document.getElementById("nextPageBtn");
+/* ========= DOM ELEMENTS ========= */
+const carouselContainer = document.getElementById("carouselContainer");
+const carouselContainerDraudimas = document.getElementById("carouselContainerDraudimas");
+const grid = document.getElementById("grid");
+const overlay = document.getElementById("overlay");
+const pdfCanvas = document.getElementById("pdfCanvas");
+const closeBtn = document.getElementById("closeBtn");
+const prevPageBtn = document.getElementById("prevPageBtn");
+const nextPageBtn = document.getElementById("nextPageBtn");
 
-    /* ========= STATE ========= */
-    let currentPdfDoc = null;
-    let currentPdfPath = null;
-    let currentPage = 1;
-    let totalPages = 1;
-    const pdfCache = new Map();
+/* ========= STATE ========= */
+let currentPdfDoc = null;
+let currentPdfPath = null;
+let currentPage = 1;
+let totalPages = 1;
+const pdfCache = new Map();
 
-    /* ========= PDF HELPERS ========= */
-    async function getPdfDoc(pdfPath) {
-      if (pdfCache.has(pdfPath)) return pdfCache.get(pdfPath);
-      const loadingTask = pdfjsLib.getDocument(encodeURI(pdfPath));
-      const pdf = await loadingTask.promise;
-      pdfCache.set(pdfPath, pdf);
-      return pdf;
-    }
+/* Utility: remove .pdf */
+function niceName(pdfPath) {
+  return pdfPath.split("/").pop().replace(/\.pdf$/i, "");
+}
 
-    async function generateThumbnailForPage(pdf, pageNumber) {
-      const page = await pdf.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 0.35 });
-      const canvas = document.createElement("canvas");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-      return canvas.toDataURL();
-    }
+/* ========= PDF HELPERS ========= */
+async function getPdfDoc(pdfPath) {
+  if (pdfCache.has(pdfPath)) return pdfCache.get(pdfPath);
+  const pdf = await pdfjsLib.getDocument(encodeURI(pdfPath)).promise;
+  pdfCache.set(pdfPath, pdf);
+  return pdf;
+}
 
-    async function createCard(pdfPath, pageNumber, labelText, isCarousel) {
-      const card = document.createElement("div");
-      card.className = isCarousel ? "carousel-item" : "grid-item";
-      const img = document.createElement("img");
-      const pdf = await getPdfDoc(pdfPath);
-      img.src = await generateThumbnailForPage(pdf, pageNumber);
-      const thumb = document.createElement("div");
-      thumb.className = "thumb";
-      thumb.appendChild(img);
-      const title = document.createElement("div");
-      title.className = "title";
-      title.textContent = labelText;
-      card.appendChild(thumb);
-      card.appendChild(title);
-      card.onclick = () => openPDF(pdfPath, pageNumber);
-      return card;
-    }
+async function generateThumbnailForPage(pdf, pageNumber) {
+  const page = await pdf.getPage(pageNumber);
+  const viewport = page.getViewport({ scale: 0.35 });
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+  return canvas.toDataURL();
+}
 
-    /* ========= FULLSCREEN PDF ========= */
-    async function renderCurrentPage() {
-      if (!currentPdfDoc) return;
-      const page = await currentPdfDoc.getPage(currentPage);
-      const viewport1x = page.getViewport({ scale: 1 });
-      const screenW = window.innerWidth * 0.95;
-      const screenH = window.innerHeight * 0.95;
-      const fitScale = Math.min(screenW / viewport1x.width, screenH / viewport1x.height);
-      const dpr = window.devicePixelRatio || 1;
-      const oversample = 2;
-      const renderScale = fitScale * oversample * dpr;
-      const renderViewport = page.getViewport({ scale: renderScale });
-      pdfCanvas.width = renderViewport.width;
-      pdfCanvas.height = renderViewport.height;
-      pdfCanvas.style.width = `${viewport1x.width * fitScale}px`;
-      pdfCanvas.style.height = `${viewport1x.height * fitScale}px`;
-      const ctx = pdfCanvas.getContext("2d");
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
-      updateNavButtons();
-    }
+async function createCard(pdfPath, pageNumber, labelText, isCarousel) {
+  const card = document.createElement("div");
+  card.className = isCarousel ? "carousel-item" : "grid-item";
 
-    function updateNavButtons() {
-      prevPageBtn.style.display = totalPages <= 1 ? "none" : (currentPage > 1 ? "flex" : "none");
-      nextPageBtn.style.display = totalPages <= 1 ? "none" : (currentPage < totalPages ? "flex" : "none");
-    }
+  const img = document.createElement("img");
+  const pdf = await getPdfDoc(pdfPath);
+  img.src = await generateThumbnailForPage(pdf, pageNumber);
 
-    async function openPDF(pdfPath, pageNumber) {
-      overlay.style.display = "flex";
-      requestAnimationFrame(() => overlay.classList.add("active"));
-      currentPdfPath = pdfPath;
-      currentPdfDoc = await getPdfDoc(pdfPath);
-      totalPages = currentPdfDoc.numPages || 1;
-      currentPage = pageNumber || 1;
-      await renderCurrentPage();
-    }
+  const thumb = document.createElement("div");
+  thumb.className = "thumb";
+  thumb.appendChild(img);
 
-    /* ========= CAROUSEL RENDER ========= */
-    async function renderCarousel(container, pdfList) {
+  const title = document.createElement("div");
+  title.className = "title";
+  title.textContent = labelText;
+
+  card.appendChild(thumb);
+  card.appendChild(title);
+
+  card.onclick = () => openPDF(pdfPath, pageNumber);
+
+  return card;
+}
+
+/* ========= FULLSCREEN PDF ========= */
+async function renderCurrentPage() {
+  if (!currentPdfDoc) return;
+
+  const page = await currentPdfDoc.getPage(currentPage);
+  const viewport1x = page.getViewport({ scale: 1 });
+
+  const screenW = window.innerWidth * 0.95;
+  const screenH = window.innerHeight * 0.95;
+
+  const fitScale = Math.min(screenW / viewport1x.width, screenH / viewport1x.height);
+
+  const dpr = window.devicePixelRatio || 1;
+  const oversample = 2;
+  const renderScale = fitScale * oversample * dpr;
+
+  const renderViewport = page.getViewport({ scale: renderScale });
+
+  pdfCanvas.width = renderViewport.width;
+  pdfCanvas.height = renderViewport.height;
+
+  pdfCanvas.style.width = `${viewport1x.width * fitScale}px`;
+  pdfCanvas.style.height = `${viewport1x.height * fitScale}px`;
+
+  const ctx = pdfCanvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
+
+  updateNavButtons();
+}
+
+function updateNavButtons() {
+  prevPageBtn.style.display = totalPages <= 1 ? "none" : currentPage > 1 ? "flex" : "none";
+  nextPageBtn.style.display = totalPages <= 1 ? "none" : currentPage < totalPages ? "flex" : "none";
+}
+
+async function openPDF(pdfPath, pageNumber) {
+  overlay.style.display = "flex";
+  requestAnimationFrame(() => overlay.classList.add("active"));
+
+  currentPdfPath = pdfPath;
+  currentPdfDoc = await getPdfDoc(pdfPath);
+  totalPages = currentPdfDoc.numPages || 1;
+
+  currentPage = pageNumber || 1;
+  await renderCurrentPage();
+}
+
+/* ========= CAROUSEL RENDER ========= */
+async function renderCarousel(container, pdfList) {
   for (const pdfPath of pdfList) {
     const pdf = await getPdfDoc(pdfPath);
-    const numPages = pdf.numPages || 1;
+    const numPages = pdf.numPages;
 
     const block = document.createElement("div");
+
     const titleDiv = document.createElement("div");
     titleDiv.className = "pdf-block-title";
-    titleDiv.textContent = pdfPath.split("/").pop();
+    titleDiv.textContent = niceName(pdfPath);
+
     const wrapper = document.createElement("div");
     wrapper.className = "carousel-wrapper";
 
@@ -174,38 +200,38 @@
     container.appendChild(block);
 
     for (let p = 1; p <= numPages; p++) {
-      // No more "Puslapis X / Y"
       const card = await createCard(pdfPath, p, "", true);
       wrapper.appendChild(card);
     }
   }
 }
 
+renderCarousel(carouselContainer, multiPagePdfs);
+renderCarousel(carouselContainerDraudimas, draudimasPdfs);
 
-    renderCarousel(carouselContainer, multiPagePdfs);
-    renderCarousel(carouselContainerDraudimas, draudimasPdfs);
+/* ========= GRID RENDER ========= */
+(async () => {
+  for (const pdfPath of singlePagePdfs) {
+    const card = await createCard(pdfPath, 1, niceName(pdfPath), false);
+    grid.appendChild(card);
+  }
+})();
 
-    /* ========= GRID RENDER ========= */
-    (async () => {
-      for (const pdfPath of singlePagePdfs) {
-        const card = await createCard(pdfPath, 1, pdfPath.split("/").pop(), false);
-        grid.appendChild(card);
-      }
-    })();
+/* ========= FULLSCREEN CONTROLS ========= */
+closeBtn.onclick = () => {
+  overlay.classList.remove("active");
+  setTimeout(() => {
+    overlay.style.display = "none";
+    const ctx = pdfCanvas.getContext("2d");
+    ctx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+  }, 350);
+};
 
-    /* ========= FULLSCREEN CONTROLS ========= */
-    closeBtn.onclick = () => {
-      overlay.classList.remove("active");
-      setTimeout(() => {
-        overlay.style.display = "none";
-        const ctx = pdfCanvas.getContext("2d");
-        ctx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
-      }, 350);
-    };
+overlay.onclick = (e) => { if (e.target === overlay) closeBtn.onclick(); };
+prevPageBtn.onclick = async (e) => { e.stopPropagation(); if (currentPage > 1) { currentPage--; await renderCurrentPage(); } };
+nextPageBtn.onclick = async (e) => { e.stopPropagation(); if (currentPage < totalPages) { currentPage++; await renderCurrentPage(); } };
 
-    overlay.onclick = (e) => { if (e.target === overlay) closeBtn.onclick(); };
-    prevPageBtn.onclick = async (e) => { e.stopPropagation(); if (currentPage>1) {currentPage--; await renderCurrentPage();} };
-    nextPageBtn.onclick = async (e) => { e.stopPropagation(); if (currentPage<totalPages) {currentPage++; await renderCurrentPage();} };
-  </script>
+</script>
+
 </body>
 </html>
