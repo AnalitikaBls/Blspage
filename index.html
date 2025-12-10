@@ -158,25 +158,29 @@
 
     /* ========= CAROUSEL RENDER ========= */
     async function renderCarousel(container, pdfList) {
-      for (const pdfPath of pdfList) {
-        const pdf = await getPdfDoc(pdfPath);
-        const numPages = pdf.numPages || 1;
-        const block = document.createElement("div");
-        const titleDiv = document.createElement("div");
-        titleDiv.className = "pdf-block-title";
-        titleDiv.textContent = pdfPath.split("/").pop();
-        const wrapper = document.createElement("div");
-        wrapper.className = "carousel-wrapper";
-        block.appendChild(titleDiv);
-        block.appendChild(wrapper);
-        container.appendChild(block);
-        for (let p = 1; p <= numPages; p++) {
-          const label = `Puslapis ${p} / ${numPages}`;
-          const card = await createCard(pdfPath, p, label, true);
-          wrapper.appendChild(card);
-        }
-      }
+  for (const pdfPath of pdfList) {
+    const pdf = await getPdfDoc(pdfPath);
+    const numPages = pdf.numPages || 1;
+
+    const block = document.createElement("div");
+    const titleDiv = document.createElement("div");
+    titleDiv.className = "pdf-block-title";
+    titleDiv.textContent = pdfPath.split("/").pop();
+    const wrapper = document.createElement("div");
+    wrapper.className = "carousel-wrapper";
+
+    block.appendChild(titleDiv);
+    block.appendChild(wrapper);
+    container.appendChild(block);
+
+    for (let p = 1; p <= numPages; p++) {
+      // No more "Puslapis X / Y"
+      const card = await createCard(pdfPath, p, "", true);
+      wrapper.appendChild(card);
     }
+  }
+}
+
 
     renderCarousel(carouselContainer, multiPagePdfs);
     renderCarousel(carouselContainerDraudimas, draudimasPdfs);
