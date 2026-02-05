@@ -38,6 +38,12 @@
   </div>
 
 <script>
+/* ========= CONFIG ========= */
+const isMobile = window.innerWidth < 768;
+const THUMB_SCALE = isMobile ? 0.22 : 0.35;
+const PLACEHOLDER =
+  "data:image/svg+xml;charset=UTF-8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='280'><rect width='100%' height='100%' fill='%23eee'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-size='14'>Loading…</text></svg>";
+
 /* ========= FILE LISTS ========= */
 const multiPagePdfs = [
   "PDF`s/Antėja.pdf",
@@ -82,8 +88,7 @@ const singlePagePdfs = [
   "PDF`s/Alkava.pdf"
 ];
 
-
-/* ========= DOM ELEMENTS ========= */
+/* ========= DOM ========= */
 const carouselContainer = document.getElementById("carouselContainer");
 const carouselContainerDraudimas = document.getElementById("carouselContainerDraudimas");
 const grid = document.getElementById("grid");
@@ -95,17 +100,16 @@ const nextPageBtn = document.getElementById("nextPageBtn");
 
 /* ========= STATE ========= */
 let currentPdfDoc = null;
-let currentPdfPath = null;
 let currentPage = 1;
 let totalPages = 1;
 const pdfCache = new Map();
 
-/* Utility: remove .pdf */
+/* ========= UTILS ========= */
 function niceName(pdfPath) {
   return pdfPath.split("/").pop().replace(/\.pdf$/i, "");
 }
 
-/* ========= PDF HELPERS ========= */
+/* ========= PDF ========= */
 async function getPdfDoc(pdfPath) {
   if (pdfCache.has(pdfPath)) return pdfCache.get(pdfPath);
   const pdf = await pdfjsLib.getDocument(encodeURI(pdfPath)).promise;
@@ -113,23 +117,37 @@ async function getPdfDoc(pdfPath) {
   return pdf;
 }
 
-async function generateThumbnailForPage(pdf, pageNumber) {
+async function generateThumbnail(pdfPath, pageNumber, img) {
+  const pdf = await getPdfDoc(pdfPath);
   const page = await pdf.getPage(pageNumber);
-  const viewport = page.getViewport({ scale: 0.35 });
+  const viewport = page.getViewport({ scale: THUMB_SCALE });
   const canvas = document.createElement("canvas");
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-  return canvas.toDataURL();
+  img.src = canvas.toDataURL();
 }
 
-async function createCard(pdfPath, pageNumber, labelText, isCarousel) {
+/* ========= LAZY LOAD ========= */
+function observeThumbnail(card, pdfPath, pageNumber) {
+  const img = card.querySelector("img");
+
+  const observer = new IntersectionObserver(async ([entry]) => {
+    if (!entry.isIntersecting) return;
+    observer.disconnect();
+    generateThumbnail(pdfPath, pageNumber, img);
+  }, { rootMargin: "150px" });
+
+  observer.observe(card);
+}
+
+/* ========= CARDS ========= */
+function createCard(pdfPath, pageNumber, labelText, isCarousel) {
   const card = document.createElement("div");
   card.className = isCarousel ? "carousel-item" : "grid-item";
 
   const img = document.createElement("img");
-  const pdf = await getPdfDoc(pdfPath);
-  img.src = await generateThumbnailForPage(pdf, pageNumber);
+  img.src = PLACEHOLDER;
 
   const thumb = document.createElement("div");
   thumb.className = "thumb";
@@ -141,113 +159,85 @@ async function createCard(pdfPath, pageNumber, labelText, isCarousel) {
 
   card.appendChild(thumb);
   card.appendChild(title);
-
   card.onclick = () => openPDF(pdfPath, pageNumber);
 
+  observeThumbnail(card, pdfPath, pageNumber);
   return card;
 }
 
-/* ========= FULLSCREEN PDF ========= */
+/* ========= FULLSCREEN ========= */
 async function renderCurrentPage() {
-  if (!currentPdfDoc) return;
-
   const page = await currentPdfDoc.getPage(currentPage);
-  const viewport1x = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: 1 });
 
-  const screenW = window.innerWidth * 0.95;
-  const screenH = window.innerHeight * 0.95;
+  const fit = Math.min(
+    window.innerWidth * 0.95 / viewport.width,
+    window.innerHeight * 0.95 / viewport.height
+  );
 
-  const fitScale = Math.min(screenW / viewport1x.width, screenH / viewport1x.height);
-
-  const dpr = window.devicePixelRatio || 1;
-  const oversample = 2;
-  const renderScale = fitScale * oversample * dpr;
-
-  const renderViewport = page.getViewport({ scale: renderScale });
+  const scale = fit * (window.devicePixelRatio || 1);
+  const renderViewport = page.getViewport({ scale });
 
   pdfCanvas.width = renderViewport.width;
   pdfCanvas.height = renderViewport.height;
+  pdfCanvas.style.width = viewport.width * fit + "px";
+  pdfCanvas.style.height = viewport.height * fit + "px";
 
-  pdfCanvas.style.width = `${viewport1x.width * fitScale}px`;
-  pdfCanvas.style.height = `${viewport1x.height * fitScale}px`;
+  await page.render({
+    canvasContext: pdfCanvas.getContext("2d"),
+    viewport: renderViewport
+  }).promise;
 
-  const ctx = pdfCanvas.getContext("2d");
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-
-  await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
-
-  updateNavButtons();
-}
-
-function updateNavButtons() {
-  prevPageBtn.style.display = totalPages <= 1 ? "none" : currentPage > 1 ? "flex" : "none";
-  nextPageBtn.style.display = totalPages <= 1 ? "none" : currentPage < totalPages ? "flex" : "none";
+  prevPageBtn.style.display = currentPage > 1 ? "flex" : "none";
+  nextPageBtn.style.display = currentPage < totalPages ? "flex" : "none";
 }
 
 async function openPDF(pdfPath, pageNumber) {
   overlay.style.display = "flex";
   requestAnimationFrame(() => overlay.classList.add("active"));
 
-  currentPdfPath = pdfPath;
   currentPdfDoc = await getPdfDoc(pdfPath);
-  totalPages = currentPdfDoc.numPages || 1;
-
+  totalPages = currentPdfDoc.numPages;
   currentPage = pageNumber || 1;
-  await renderCurrentPage();
+  renderCurrentPage();
 }
 
-/* ========= CAROUSEL RENDER ========= */
-async function renderCarousel(container, pdfList) {
-  for (const pdfPath of pdfList) {
+/* ========= RENDER ========= */
+function renderCarousel(container, list) {
+  list.forEach(async pdfPath => {
     const pdf = await getPdfDoc(pdfPath);
-    const numPages = pdf.numPages;
-
     const block = document.createElement("div");
-
-    const titleDiv = document.createElement("div");
-    titleDiv.className = "pdf-block-title";
-    titleDiv.textContent = niceName(pdfPath);
+    const title = document.createElement("div");
+    title.className = "pdf-block-title";
+    title.textContent = niceName(pdfPath);
 
     const wrapper = document.createElement("div");
     wrapper.className = "carousel-wrapper";
 
-    block.appendChild(titleDiv);
-    block.appendChild(wrapper);
+    block.append(title, wrapper);
     container.appendChild(block);
 
-    for (let p = 1; p <= numPages; p++) {
-      const card = await createCard(pdfPath, p, "", true);
-      wrapper.appendChild(card);
+    for (let p = 1; p <= pdf.numPages; p++) {
+      wrapper.appendChild(createCard(pdfPath, p, "", true));
     }
-  }
+  });
 }
 
 renderCarousel(carouselContainer, multiPagePdfs);
 renderCarousel(carouselContainerDraudimas, draudimasPdfs);
 
-/* ========= GRID RENDER ========= */
-(async () => {
-  for (const pdfPath of singlePagePdfs) {
-    const card = await createCard(pdfPath, 1, niceName(pdfPath), false);
-    grid.appendChild(card);
-  }
-})();
+singlePagePdfs.forEach(pdf =>
+  grid.appendChild(createCard(pdf, 1, niceName(pdf), false))
+);
 
-/* ========= FULLSCREEN CONTROLS ========= */
+/* ========= CONTROLS ========= */
 closeBtn.onclick = () => {
   overlay.classList.remove("active");
-  setTimeout(() => {
-    overlay.style.display = "none";
-    const ctx = pdfCanvas.getContext("2d");
-    ctx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
-  }, 350);
+  setTimeout(() => overlay.style.display = "none", 300);
 };
-
-overlay.onclick = (e) => { if (e.target === overlay) closeBtn.onclick(); };
-prevPageBtn.onclick = async (e) => { e.stopPropagation(); if (currentPage > 1) { currentPage--; await renderCurrentPage(); } };
-nextPageBtn.onclick = async (e) => { e.stopPropagation(); if (currentPage < totalPages) { currentPage++; await renderCurrentPage(); } };
-
+prevPageBtn.onclick = e => { e.stopPropagation(); if (currentPage > 1) { currentPage--; renderCurrentPage(); }};
+nextPageBtn.onclick = e => { e.stopPropagation(); if (currentPage < totalPages) { currentPage++; renderCurrentPage(); }};
+overlay.onclick = e => e.target === overlay && closeBtn.onclick();
 </script>
 
 </body>
